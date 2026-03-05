@@ -1,0 +1,17 @@
+{
+  "name": "루트마스터",
+  "short_name": "루트마스터",
+  "description": "TSP 기반 경로 최적화 앱",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "start_url": "./루트마스터_v3.4.html",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/maps/map/materialicons/48dp/2x/baseline_map_black_48dp.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    }
+  ]
+}
