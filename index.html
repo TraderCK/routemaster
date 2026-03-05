@@ -8,7 +8,6 @@
 <meta name="theme-color" content="#0d1117">
 <title>루트마스터</title>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
-<script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"></script>
 <style>
 :root {
   --bg: #0d1117; --surface: #161b22; --card: #21262d; --border: #30363d;
@@ -29,10 +28,7 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
 .mode-tab.active { background:var(--accent); color:#000; font-weight:700; }
 
 /* MAP */
-#map { flex:1; position:relative; background:var(--surface); min-height:0; transition:all 0.3s ease; cursor:pointer; }
-#map.fullscreen { position:fixed; inset:0; z-index:100; max-width:100%; cursor:default; }
-.btn-map-close { position:absolute; top:12px; right:12px; z-index:101; background:rgba(13,17,23,0.85); border:1px solid var(--border); color:var(--text); width:36px; height:36px; border-radius:50%; font-size:1rem; cursor:pointer; display:none; align-items:center; justify-content:center; }
-#map.fullscreen .btn-map-close { display:flex; }
+#map { flex:1; position:relative; background:var(--surface); min-height:0; }
 .map-empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; pointer-events:none; z-index:1; }
 .map-empty.hide { display:none; }
 .map-empty-icon { font-size:2.5rem; }
@@ -113,7 +109,6 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
 .save-label { font-size:0.76rem; color:var(--muted); }
 .save-val { font-family:'Black Han Sans',sans-serif; font-size:1.15rem; color:var(--accent); }
 .btn-navi { margin:10px 16px 0; width:calc(100% - 32px); padding:12px; background:#FEE500; border:none; border-radius:10px; color:#000; font-family:'Black Han Sans',sans-serif; font-size:0.95rem; letter-spacing:1px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
-.btn-navi2 { margin:6px 16px 0; width:calc(100% - 32px); padding:12px; background:#3A1D94; border:none; border-radius:10px; color:#fff; font-family:'Black Han Sans',sans-serif; font-size:0.95rem; letter-spacing:1px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
 
 /* STATUS */
 .status-bar { position:absolute; bottom:70px; left:16px; right:16px; background:rgba(22,27,34,0.95); border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:0.78rem; color:var(--muted); z-index:10; display:none; text-align:center; }
@@ -145,7 +140,6 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
       <div class="map-empty-icon">🗺️</div>
       <div class="map-empty-text">출발지와 경유지를 입력하고<br>경로 최적화를 실행하세요</div>
     </div>
-    <button class="btn-map-close" onclick="closeMapFullscreen()">✕</button>
     <div class="map-stats" id="mapStats">
       <div class="mstat"><div class="mstat-val" id="sStops">-</div><div class="mstat-label">경유지</div></div>
       <div class="mstat"><div class="mstat-val" id="sDist">-</div><div class="mstat-label">총 거리</div></div>
@@ -162,7 +156,7 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
       <div class="field-row">
         <div class="fdot s"></div>
         <div class="iw">
-          <input class="fi" id="fi-start" placeholder="출발지 (예: 광화문역)" autocomplete="off">
+          <input class="fi" id="fi-start" placeholder="출발지 (예: 부산역)" autocomplete="off">
           <div class="ac-list" id="ac-start"></div>
         </div>
       </div>
@@ -170,7 +164,7 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
       <div class="field-row">
         <div class="fdot e"></div>
         <div class="iw">
-          <input class="fi" id="fi-end" placeholder="도착지" autocomplete="off">
+          <input class="fi" id="fi-end" placeholder="도착지 (비워두면 출발지 복귀)" autocomplete="off">
           <div class="ac-list" id="ac-end"></div>
         </div>
       </div>
@@ -202,7 +196,6 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
       <div class="save-val" id="saveVal">-</div>
     </div>
     <button class="btn-navi" onclick="openNavi()">🗺 카카오맵으로 길찾기</button>
-    <button class="btn-navi2" onclick="openKakaoNavi()">🧭 카카오내비로 길안내</button>
   </div>
 
   <!-- Status -->
@@ -290,18 +283,8 @@ function setupInputs() {
 function setupAC(inputId, acId) {
   const input = document.getElementById(inputId);
   const acEl = document.getElementById(acId);
-  let isComposing = false;
 
-  input.addEventListener('compositionstart', () => { isComposing = true; });
-  input.addEventListener('compositionend', () => {
-    isComposing = false;
-    clearTimeout(acTimers[inputId]);
-    const val = input.value.trim();
-    if (val.length < 2) { acEl.style.display = 'none'; return; }
-    acTimers[inputId] = setTimeout(() => doSearch(val, acEl, input), 250);
-  });
   input.addEventListener('input', () => {
-    if (isComposing) return;
     clearTimeout(acTimers[inputId]);
     const val = input.value.trim();
     if (val.length < 2) { acEl.style.display = 'none'; return; }
@@ -373,18 +356,7 @@ function renderStops() {
     // AC 설정
     const input = div.querySelector(`#fi-s${stop.id}`);
     const acEl = div.querySelector(`#${acId}`);
-    let isComposing = false;
-    input.addEventListener('compositionstart', () => { isComposing = true; });
-    input.addEventListener('compositionend', () => {
-      isComposing = false;
-      stops[i].name = input.value;
-      clearTimeout(acTimers[stop.id]);
-      const val = input.value.trim();
-      if (val.length < 2) { acEl.style.display = 'none'; return; }
-      acTimers[stop.id] = setTimeout(() => doSearch(val, acEl, input), 250);
-    });
     input.addEventListener('input', () => {
-      if (isComposing) return;
       stops[i].name = input.value;
       clearTimeout(acTimers[stop.id]);
       const val = input.value.trim();
@@ -406,7 +378,7 @@ function togOpt(k) {
 
 // ── MODE ──
 const samples = {
-  travel: { start:'광화문역 5호선', end:'', stops:['경주불국사','안동하회마을'] },
+  travel: { start:'부산역', end:'', stops:['해운대 해수욕장','광안리 해수욕장','감천문화마을'] },
   delivery: { start:'강남구청역', end:'', stops:['역삼동','선릉역','삼성동 코엑스'] },
   tour: { start:'경복궁', end:'', stops:['북촌한옥마을','창덕궁','인사동'] }
 };
@@ -567,8 +539,6 @@ function drawMap(cs, names) {
   kcs.forEach(c => bounds.extend(c));
   kakaoMap.setBounds(bounds);
   document.getElementById('mapEmpty').classList.add('hide');
-  // 지도 터치/클릭 → 전체화면
-  kakao.maps.event.addListener(kakaoMap, 'click', openMapFullscreen);
 }
 
 // ── RESULT ──
@@ -605,45 +575,6 @@ function showResult(names, cs, optD, savings, totalMin) {
 
 function closeSheet() { document.getElementById('sheet').classList.remove('open'); }
 
-function openKakaoNavi() {
-  if (!result) return;
-  const { ordNames, ordCs } = result;
-
-  // 출발지(index 0) 제외. 마지막이 목적지, 중간은 경유지
-  // ordNames: [출발, 경유1, 경유2, ..., 목적지]
-  const destIdx = ordNames.length - 1;
-  const destName = ordNames[destIdx];
-  const destC = ordCs[destIdx];
-
-  // 경유지: index 1 ~ destIdx-1
-  const viaPoints = [];
-  for (let i = 1; i < destIdx; i++) {
-    viaPoints.push({ name: ordNames[i], x: ordCs[i].lng, y: ordCs[i].lat });
-  }
-
-  if (!window.Kakao) { alert('카카오 SDK가 로드되지 않았습니다.'); return; }
-  if (!Kakao.isInitialized()) {
-    Kakao.init('4d1307b368487f762cb7e2681ede2435');
-  }
-
-  try {
-    const naviParams = {
-      name: destName,
-      x: destC.lng,
-      y: destC.lat,
-      coordType: 'wgs84'
-    };
-    if (viaPoints.length > 0) {
-      naviParams.viaPoints = viaPoints.map(p => ({
-        name: p.name, x: p.x, y: p.y
-      }));
-    }
-    Kakao.Navi.start(naviParams);
-  } catch(e) {
-    alert('카카오내비 실행 실패: ' + e.message);
-  }
-}
-
 function openNavi() {
   if (!result) return;
   const { ordNames } = result;
@@ -657,18 +588,6 @@ function openNavi() {
 }
 
 // ── START ──
-function openMapFullscreen() {
-  if (!result) return;
-  const mapEl = document.getElementById('map');
-  mapEl.classList.add('fullscreen');
-  setTimeout(() => kakaoMap.relayout(), 300);
-}
-function closeMapFullscreen() {
-  const mapEl = document.getElementById('map');
-  mapEl.classList.remove('fullscreen');
-  setTimeout(() => kakaoMap.relayout(), 300);
-}
-
 window.onload = initApp;
 </script>
 </body>
