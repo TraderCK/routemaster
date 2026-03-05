@@ -4,6 +4,7 @@
   v1.1 - 2026.03.05  dist() 도로보정계수 1.25 적용
   v2.0 - 2026.03.05  내 장소 / 내 루트 기능 추가 (localStorage)
   v2.1 - 2026.03.05  아이콘 교체(🍽️🎠🏔️📖), 장소 편집 기능 추가
+  v3.0 - 2026.03.05  전체화면 내 위치 실시간 표시, 지도 회전, 가로보기 최적화
 -->
 
 <!DOCTYPE html>
@@ -157,7 +158,14 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
 .status-bar { position:absolute; bottom:70px; left:16px; right:16px; background:rgba(22,27,34,0.95); border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:0.78rem; color:var(--muted); z-index:10; display:none; text-align:center; }
 .status-bar.show { display:block; }
 
-/* LOADING */
+/* v3.0 추가: 전체화면 내 위치 버튼 */
+.btn-myloc { position:absolute; bottom:20px; right:16px; z-index:102; background:rgba(13,17,23,0.9); border:1px solid var(--border); color:var(--accent); width:44px; height:44px; border-radius:50%; font-size:1.2rem; cursor:pointer; display:none; align-items:center; justify-content:center; box-shadow:0 2px 12px rgba(0,0,0,0.5); transition:all 0.15s; }
+#map.fullscreen .btn-myloc { display:flex; }
+.btn-myloc.tracking { border-color:var(--accent); background:rgba(240,180,41,0.15); }
+/* v3.0 추가: 내 위치 마커 (파란 점) */
+.my-loc-dot { width:18px; height:18px; background:#4A90E2; border:3px solid #fff; border-radius:50%; box-shadow:0 0 0 4px rgba(74,144,226,0.3); position:relative; }
+.my-loc-dot::after { content:''; position:absolute; inset:-6px; border-radius:50%; background:rgba(74,144,226,0.15); animation:locPulse 2s ease-out infinite; }
+@keyframes locPulse { 0%{transform:scale(1);opacity:1} 100%{transform:scale(2.5);opacity:0} }
 .loading { position:absolute; inset:0; background:rgba(13,17,23,0.85); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:30; gap:10px; }
 .loading.show { display:flex; }
 .spinner { width:38px; height:38px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
@@ -234,6 +242,8 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
       <div class="map-empty-text">출발지와 경유지를 입력하고<br>경로 최적화를 실행하세요</div>
     </div>
     <button class="btn-map-close" onclick="closeMapFullscreen()">✕</button>
+    <!-- v3.0 추가: 전체화면 내 위치 버튼 -->
+    <button class="btn-myloc" id="btnMyLoc" onclick="toggleMyLocation()" title="내 위치">📍</button>
     <div class="map-stats" id="mapStats">
       <div class="mstat"><div class="mstat-val" id="sStops">-</div><div class="mstat-label">경유지</div></div>
       <div class="mstat"><div class="mstat-val" id="sDist">-</div><div class="mstat-label">총 거리</div></div>
@@ -362,7 +372,7 @@ async function initApp() {
 
     // 지도 초기화
     const container = document.getElementById('map');
-    const options = { center: new kakao.maps.LatLng(37.5665, 126.9780), level: 8 };
+    const options = { center: new kakao.maps.LatLng(37.5665, 126.9780), level: 8, rotateEnable: true };
     kakaoMap = new kakao.maps.Map(container, options);
     ps = new kakao.maps.services.Places();
     geocoder = new kakao.maps.services.Geocoder();
@@ -823,8 +833,85 @@ function openMapFullscreen() {
 function closeMapFullscreen() {
   const mapEl = document.getElementById('map');
   mapEl.classList.remove('fullscreen');
+  stopMyLocation();
   setTimeout(() => kakaoMap.relayout(), 300);
 }
+
+// ────────────────────────────────────────
+// v3.0 추가: 내 위치 실시간 추적
+// ────────────────────────────────────────
+let myLocMarker = null;
+let myLocWatchId = null;
+let myLocTracking = false;
+
+function toggleMyLocation() {
+  if (myLocTracking) {
+    stopMyLocation();
+  } else {
+    startMyLocation();
+  }
+}
+
+function startMyLocation() {
+  if (!navigator.geolocation) { alert('위치 서비스를 사용할 수 없습니다.'); return; }
+  myLocTracking = true;
+  document.getElementById('btnMyLoc').classList.add('tracking');
+  document.getElementById('btnMyLoc').textContent = '🔵';
+
+  myLocWatchId = navigator.geolocation.watchPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const latlng = new kakao.maps.LatLng(lat, lng);
+
+      if (!myLocMarker) {
+        const content = '<div class="my-loc-dot"></div>';
+        myLocMarker = new kakao.maps.CustomOverlay({
+          map: kakaoMap,
+          position: latlng,
+          content,
+          yAnchor: 0.5,
+          xAnchor: 0.5,
+          zIndex: 10
+        });
+      } else {
+        myLocMarker.setPosition(latlng);
+      }
+
+      // 첫 수신 시 지도 중심 이동
+      if (myLocTracking) {
+        kakaoMap.setCenter(latlng);
+        myLocTracking = 'active'; // 이후엔 중심 고정 안 함 (자유 탐색 가능)
+      }
+    },
+    err => {
+      alert('위치를 가져올 수 없습니다: ' + err.message);
+      stopMyLocation();
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
+  );
+}
+
+function stopMyLocation() {
+  if (myLocWatchId !== null) {
+    navigator.geolocation.clearWatch(myLocWatchId);
+    myLocWatchId = null;
+  }
+  if (myLocMarker) {
+    myLocMarker.setMap(null);
+    myLocMarker = null;
+  }
+  myLocTracking = false;
+  const btn = document.getElementById('btnMyLoc');
+  if (btn) { btn.classList.remove('tracking'); btn.textContent = '📍'; }
+}
+
+// v3.0 추가: 가로/세로 전환 시 지도 relayout
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    if (kakaoMap) kakaoMap.relayout();
+  }, 300);
+});
 
 // ────────────────────────────────────────
 // v2.0 추가: 내 장소 / 내 루트
