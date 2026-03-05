@@ -588,7 +588,10 @@ function openNavi() {
 }
 
 // ── START ──
-window.onload = initApp;
+window.onload = function() {
+  document.getElementById('sheet').classList.remove('open');
+  initApp();
+};
 </script>
 </body>
 </html>
