@@ -3,6 +3,7 @@
   v1.0 - 2026.03.05  최초 완성 버전
   v1.1 - 2026.03.05  dist() 도로보정계수 1.25 적용
   v2.0 - 2026.03.05  내 장소 / 내 루트 기능 추가 (localStorage)
+  v2.1 - 2026.03.05  아이콘 교체(🍽️🎠🏔️📖), 장소 편집 기능 추가
 -->
 
 <!DOCTYPE html>
@@ -183,6 +184,15 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
 .place-addr { font-size:0.72rem; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .btn-place-del { background:none; border:none; color:var(--muted); cursor:pointer; font-size:0.9rem; padding:4px; transition:color 0.15s; flex-shrink:0; }
 .btn-place-del:hover { color:var(--accent2); }
+/* v2.1 추가: 장소 편집 버튼 */
+.btn-place-edit { background:none; border:none; color:var(--muted); cursor:pointer; font-size:0.9rem; padding:4px; transition:color 0.15s; flex-shrink:0; }
+.btn-place-edit:hover { color:var(--accent3); }
+/* v2.1 추가: 장소 편집 폼 */
+.edit-place-form { background:var(--surface); border:1px solid var(--accent3); border-radius:12px; padding:14px; margin-top:6px; }
+.edit-place-form .icon-picker { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.edit-btns { display:flex; gap:8px; margin-top:8px; }
+.btn-edit-save { flex:1; padding:9px; background:var(--accent3); border:none; border-radius:8px; color:#000; font-family:'Black Han Sans',sans-serif; font-size:0.82rem; cursor:pointer; }
+.btn-edit-cancel { padding:9px 14px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--muted); font-family:'Noto Sans KR',sans-serif; font-size:0.82rem; cursor:pointer; }
 .place-empty { text-align:center; padding:32px 16px; color:var(--muted); font-size:0.82rem; line-height:1.9; }
 .place-empty-icon { font-size:2rem; margin-bottom:8px; }
 .add-place-form { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px; }
@@ -822,7 +832,7 @@ function closeMapFullscreen() {
 
 const LS_PLACES = 'rm_places_v2';
 const LS_ROUTES = 'rm_routes_v2';
-const ICONS = ['🏠','🌳','🍜','☕','⛽','🏪','🏥','🏋️','📍','🎯','🏖️','🏔️','🛒','🎪','🏢'];
+const ICONS = ['🏠','🌳','🍽️','☕','⛽','🏪','🏥','🏋️','📍','🎯','🏖️','🏔️','🛒','🎠','🏢','🏫','💼','📖'];
 let selectedIcon = '📍';
 let addPlaceCoords = null;
 let addPlaceAcTimer = null;
@@ -917,9 +927,10 @@ function renderPlacesModal() {
       ${places.length === 0
         ? `<div class="place-empty"><div class="place-empty-icon">📌</div>자주 가는 장소를 저장해두면<br>⭐ 버튼으로 바로 선택할 수 있어요</div>`
         : `<div class="place-list">${places.map((p, i) => `
-            <div class="place-item">
+            <div class="place-item" id="place-item-${i}">
               <div class="place-icon">${p.icon}</div>
               <div class="place-info"><div class="place-name">${p.name}</div><div class="place-addr">${p.addr}</div></div>
+              <button class="btn-place-edit" onclick="openEditPlace(event,${i})">✏️</button>
               <button class="btn-place-del" onclick="deletePlace(event,${i})">🗑️</button>
             </div>`).join('')}</div>`}
     </div>
@@ -1002,6 +1013,61 @@ function deletePlace(e, idx) {
   const places = loadPlaces();
   if (!confirm(`"${places[idx].name}"을 삭제할까요?`)) return;
   places.splice(idx, 1); savePlaces(places); renderPlacesModal();
+}
+
+// v2.1 추가: 장소 편집
+let editingIcon = '📍';
+function openEditPlace(e, idx) {
+  e.stopPropagation();
+  // 이미 열려있으면 닫기
+  const existing = document.getElementById('edit-form-' + idx);
+  if (existing) { existing.remove(); return; }
+  // 다른 편집폼 모두 닫기
+  document.querySelectorAll('.edit-place-form').forEach(f => f.remove());
+
+  const places = loadPlaces();
+  const p = places[idx];
+  editingIcon = p.icon;
+
+  const form = document.createElement('div');
+  form.className = 'edit-place-form';
+  form.id = 'edit-form-' + idx;
+  form.innerHTML = `
+    <div class="icon-picker" id="edit-icon-picker-${idx}">
+      ${ICONS.map(ic => `<div class="icon-opt${ic === editingIcon ? ' on' : ''}" onclick="selectEditIcon('${ic}',${idx})">${ic}</div>`).join('')}
+    </div>
+    <input class="add-place-input" id="edit-name-${idx}" value="${p.name}" placeholder="장소 이름" maxlength="20">
+    <input class="add-place-input" id="edit-addr-${idx}" value="${p.addr}" placeholder="주소" style="margin-bottom:0">
+    <div class="edit-btns">
+      <button class="btn-edit-cancel" onclick="closeEditPlace(${idx})">취소</button>
+      <button class="btn-edit-save" onclick="saveEditPlace(${idx})">저장</button>
+    </div>`;
+
+  const item = document.getElementById('place-item-' + idx);
+  item.insertAdjacentElement('afterend', form);
+}
+
+function selectEditIcon(ic, idx) {
+  editingIcon = ic;
+  document.querySelectorAll(`#edit-icon-picker-${idx} .icon-opt`).forEach(el => el.classList.toggle('on', el.textContent === ic));
+}
+
+function closeEditPlace(idx) {
+  const form = document.getElementById('edit-form-' + idx);
+  if (form) form.remove();
+}
+
+function saveEditPlace(idx) {
+  const name = document.getElementById('edit-name-' + idx).value.trim();
+  const addr = document.getElementById('edit-addr-' + idx).value.trim();
+  if (!name) { alert('장소 이름을 입력해주세요'); return; }
+  if (!addr) { alert('주소를 입력해주세요'); return; }
+  const places = loadPlaces();
+  places[idx] = { ...places[idx], icon: editingIcon, name, addr };
+  savePlaces(places);
+  if (places[idx].lat && places[idx].lng) coords[name] = { lat: places[idx].lat, lng: places[idx].lng };
+  showStatus(`✅ "${name}" 수정 완료!`); setTimeout(hideStatus, 2000);
+  renderPlacesModal();
 }
 
 function renderRoutesModal() {
