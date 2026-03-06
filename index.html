@@ -11,6 +11,7 @@
   v3.4 - 2026.03.05  PWA 전체화면 지원 (홈화면 추가 시 주소창 제거)
   v3.5 - 2026.03.05  내 위치 파란 점에 실시간 나침반 방향 화살표 추가
   v3.6 - 2026.03.05  화살표 방향/모양 개선, 초기 지도 한반도 중심으로 변경
+  v3.7 - 2026.03.05  경유지 없이도 최적화 실행, 도보 모드 진입 시 줌 레벨 개선
 -->
 
 <!DOCTYPE html>
@@ -687,7 +688,9 @@ async function optimize() {
   const wpNames = stops.map(s => s.name.trim()).filter(Boolean);
 
   if (!startName) { alert('출발지를 입력해주세요'); return; }
-  if (wpNames.length < 1) { alert('경유지를 1개 이상 입력해주세요'); return; }
+  const hasEnd = !!endName;
+  const hasWp = wpNames.length >= 1;
+  if (!hasEnd && !hasWp) { alert('도착지 또는 경유지를 1개 이상 입력해주세요'); return; }
 
   document.getElementById('loading').classList.add('show');
   document.getElementById('loadingText').textContent = '장소 검색 중...';
@@ -707,11 +710,19 @@ async function optimize() {
 
     document.getElementById('loadingText').textContent = '경로 최적화 중...';
 
-    const bestPerm = solveTSP(startC, validCs, endC, opts.return);
-    const ordNames = [startName, ...bestPerm.map(i => validNames[i])];
-    const ordCs = [startC, ...bestPerm.map(i => validCs[i])];
-    if (endC) { ordNames.push(endName); ordCs.push(endC); }
-    else if (opts.return) { ordNames.push(startName); ordCs.push(startC); }
+    let ordNames, ordCs;
+
+    if (wpNames.length === 0) {
+      // 경유지 없음 - 출발지 → 도착지 직접 연결
+      ordNames = [startName, endName];
+      ordCs = [startC, endC];
+    } else {
+      const bestPerm = solveTSP(startC, validCs, endC, opts.return);
+      ordNames = [startName, ...bestPerm.map(i => validNames[i])];
+      ordCs = [startC, ...bestPerm.map(i => validCs[i])];
+      if (endC) { ordNames.push(endName); ordCs.push(endC); }
+      else if (opts.return) { ordNames.push(startName); ordCs.push(startC); }
+    }
 
     const optD = totalDist(ordCs);
     const naiveCs = [startC, ...validCs];
@@ -840,7 +851,19 @@ function openKakaoNavi() {
 function openMapFullscreen() {
   const mapEl = document.getElementById('map');
   mapEl.classList.add('fullscreen');
-  setTimeout(() => kakaoMap.relayout(), 300);
+  setTimeout(() => {
+    kakaoMap.relayout();
+    // 경로 최적화 전이면 현재 위치 기준 확대
+    if (!result) {
+      kakaoMap.setLevel(4);
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          kakaoMap.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
+        });
+      }
+    }
+    // 최적화 후면 기존 경로 bounds 그대로 유지
+  }, 300);
 }
 function closeMapFullscreen() {
   const mapEl = document.getElementById('map');
