@@ -12,6 +12,7 @@
   v3.5 - 2026.03.05  내 위치 파란 점에 실시간 나침반 방향 화살표 추가
   v3.6 - 2026.03.05  화살표 방향/모양 개선, 초기 지도 한반도 중심으로 변경
   v3.7 - 2026.03.05  경유지 없이도 최적화 실행, 도보 모드 진입 시 줌 레벨 개선
+  v3.8 - 2026.03.05  경로 최적화 전 지도 탭 시 파란 점 자동 표시, 빨간 버튼 ON/OFF로 지도 따라오기 제어
 -->
 
 <!DOCTYPE html>
@@ -853,16 +854,10 @@ function openMapFullscreen() {
   mapEl.classList.add('fullscreen');
   setTimeout(() => {
     kakaoMap.relayout();
-    // 경로 최적화 전이면 현재 위치 기준 확대
-    if (!result) {
-      kakaoMap.setLevel(4);
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-          kakaoMap.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
-        });
-      }
+    // 경로 최적화 전이면 파란 점 자동 시작 (지도 따라오기 OFF)
+    if (!result && !myLocTracking) {
+      startMyLocation(false);
     }
-    // 최적화 후면 기존 경로 bounds 그대로 유지
   }, 300);
 }
 function closeMapFullscreen() {
@@ -877,22 +872,37 @@ function closeMapFullscreen() {
 // ────────────────────────────────────────
 let myLocMarker = null;
 let myLocWatchId = null;
-let myLocTracking = false;
-let myArrowEl = null; // v3.5: 방향 화살표 DOM
+let myLocTracking = false; // 빨간 버튼 ON/OFF
+let myLocFollowing = false; // 지도 따라오기 여부
+let myArrowEl = null;
 
 function toggleMyLocation() {
   if (myLocTracking) {
-    stopMyLocation();
+    // 파란 점이 이미 표시 중 - 지도 따라오기만 토글
+    myLocFollowing = !myLocFollowing;
+    const btn = document.getElementById('btnMyLoc');
+    if (myLocFollowing) {
+      btn.classList.add('tracking');
+      btn.textContent = '🔵';
+    } else {
+      btn.classList.remove('tracking');
+      btn.textContent = '📍';
+    }
   } else {
+    // 파란 점도 없음 - 전체 시작
     startMyLocation();
   }
 }
 
-function startMyLocation() {
+function startMyLocation(following = true) {
   if (!navigator.geolocation) { alert('위치 서비스를 사용할 수 없습니다.'); return; }
   myLocTracking = true;
-  document.getElementById('btnMyLoc').classList.add('tracking');
-  document.getElementById('btnMyLoc').textContent = '🔵';
+  myLocFollowing = following;
+  const btn = document.getElementById('btnMyLoc');
+  if (following) {
+    btn.classList.add('tracking');
+    btn.textContent = '🔵';
+  }
 
   startCompass();
   myLocWatchId = navigator.geolocation.watchPosition(
@@ -918,8 +928,8 @@ function startMyLocation() {
         myLocMarker.setPosition(latlng);
       }
 
-      // 매번 지도 중심을 내 위치로 이동
-      kakaoMap.setCenter(latlng);
+      // 지도 따라오기는 빨간 버튼 ON일 때만
+      if (myLocFollowing) kakaoMap.setCenter(latlng);
     },
     err => {
       alert('위치를 가져올 수 없습니다: ' + err.message);
@@ -940,6 +950,7 @@ function stopMyLocation() {
   }
   myArrowEl = null;
   myLocTracking = false;
+  myLocFollowing = false;
   stopCompass();
   const btn = document.getElementById('btnMyLoc');
   if (btn) { btn.classList.remove('tracking'); btn.textContent = '📍'; }
