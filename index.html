@@ -854,8 +854,16 @@ function openMapFullscreen() {
   mapEl.classList.add('fullscreen');
   setTimeout(() => {
     kakaoMap.relayout();
-    // 경로 최적화 전이면 100m 레벨로만 조정 (내 위치 찾기 없음)
-    if (!result) kakaoMap.setLevel(4);
+    if (!result) {
+      // 초기 화면에서 내 위치가 잡혀있으면 그 위치로 100m 레벨
+      const startName = document.getElementById('fi-start').value.trim();
+      const startC = startName && coords[startName];
+      if (startC) {
+        kakaoMap.setCenter(new kakao.maps.LatLng(startC.lat, startC.lng));
+        kakaoMap.setLevel(4);
+      }
+      // 내 위치 없으면 한반도 전체 뷰 그대로
+    }
   }, 300);
 }
 function closeMapFullscreen() {
