@@ -13,7 +13,8 @@
   v3.6 - 2026.03.05  화살표 방향/모양 개선, 초기 지도 한반도 중심으로 변경
   v3.7 - 2026.03.05  경유지 없이도 최적화 실행, 도보 모드 진입 시 줌 레벨 개선
   v3.8 - 2026.03.05  경로 최적화 전 지도 탭 시 파란 점 자동 표시, 빨간 버튼 ON/OFF로 지도 따라오기 제어
-  v3.9:- 2026.03.05  백 버튼 종료 방지
+  v3.9 - 2026.03.07  백 버튼 종료 방지 (confirm 다이얼로그)
+  v3.10 - 2026.03.07 출발지/도착지/경유지 sessionStorage 자동저장 및 앱 재진입 시 복원
 -->
 
 <!DOCTYPE html>
@@ -242,7 +243,6 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
   <!-- Header -->
   <div class="header">
     <div class="logo">루트<span>마스터</span></div>
-    <!-- v2.0 추가 -->
     <div class="header-btns">
       <button class="btn-header" onclick="openModal('places')">📌 내 장소</button>
       <button class="btn-header" onclick="openModal('routes')">🗂️ 내 루트</button>
@@ -256,7 +256,6 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
       <div class="map-empty-text">출발지와 경유지를 입력하고<br>경로 최적화를 실행하세요</div>
     </div>
     <button class="btn-map-close" onclick="closeMapFullscreen()">✕</button>
-    <!-- v3.0 추가: 전체화면 내 위치 버튼 -->
     <button class="btn-myloc" id="btnMyLoc" onclick="toggleMyLocation()" title="내 위치">📍</button>
     <div class="map-stats" id="mapStats">
       <div class="mstat"><div class="mstat-val" id="sStops">-</div><div class="mstat-label">경유지</div></div>
@@ -269,13 +268,11 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
   <!-- Bottom Panel -->
   <div class="bottom" id="bottom">
     <div class="handle"><div class="handle-bar"></div></div>
-
     <div class="inputs">
       <div class="field-row">
         <div class="fdot s"></div>
         <div class="iw">
           <input class="fi" id="fi-start" placeholder="출발지 (예: 광화문역)" autocomplete="off">
-          <!-- v2.0 추가 -->
           <button class="btn-fav-pick" onclick="toggleFavPicker('start')" title="내 장소에서 선택">⭐</button>
           <div class="ac-list" id="ac-start"></div>
           <div class="fav-picker" id="fav-start"></div>
@@ -287,30 +284,23 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
         <div class="fdot e"></div>
         <div class="iw">
           <input class="fi" id="fi-end" placeholder="도착지" autocomplete="off">
-          <!-- v2.0 추가 -->
           <button class="btn-fav-pick" onclick="toggleFavPicker('end')" title="내 장소에서 선택">⭐</button>
           <div class="ac-list" id="ac-end"></div>
           <div class="fav-picker" id="fav-end"></div>
         </div>
       </div>
     </div>
-
     <div class="stops" id="stopsEl"></div>
     <button class="btn-add" onclick="addStop()">＋ 경유지 추가 (최대 7개)</button>
-
     <div class="opts">
       <button class="opt on" id="opt-short" onclick="togOpt('short')">📏 최단거리</button>
       <button class="opt on" id="opt-traffic" onclick="togOpt('traffic')">🚦 교통반영</button>
       <button class="opt" id="opt-return" onclick="togOpt('return')">🔄 출발지복귀</button>
     </div>
-
-    <!-- v2.0 추가: 루트 이름 입력바 -->
     <div class="route-name-bar" id="routeNameBar">
       <input class="route-name-input" id="routeNameInput" placeholder="루트 이름 (예: 주말 원주행)" maxlength="20">
       <button class="btn-route-confirm" onclick="confirmSaveRoute()">저장</button>
     </div>
-
-    <!-- v2.0 변경: .cta → .cta-row, 루트저장 버튼 추가 -->
     <div class="cta-row">
       <button class="btn-go" id="btnGo" onclick="optimize()">🔍 경로 최적화</button>
       <button class="btn-save-route" onclick="toggleRouteSave()">🗂️ 루트저장</button>
@@ -367,11 +357,7 @@ function loadKakaoSDK() {
     if (window.kakao && window.kakao.maps) { resolve(); return; }
     const s = document.createElement('script');
     s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_KEY}&libraries=services&autoload=false`;
-    s.onload = () => {
-      kakao.maps.load(() => {
-        resolve();
-      });
-    };
+    s.onload = () => { kakao.maps.load(() => { resolve(); }); };
     s.onerror = () => reject(new Error('카카오 SDK 로드 실패'));
     document.head.appendChild(s);
   });
@@ -384,41 +370,41 @@ async function initApp() {
     await loadKakaoSDK();
     kakaoReady = true;
 
-    // 지도 초기화
     const container = document.getElementById('map');
     const options = { center: new kakao.maps.LatLng(36.5, 127.5), level: 13 };
     kakaoMap = new kakao.maps.Map(container, options);
     ps = new kakao.maps.services.Places();
     geocoder = new kakao.maps.services.Geocoder();
 
-    // 지도 탭 → 전체화면 (최적화 전후 모두)
     kakao.maps.event.addListener(kakaoMap, 'click', openMapFullscreen);
 
-    // 현재 위치로 지도 이동 + 출발지 자동 입력
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(pos => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         kakaoMap.setCenter(new kakao.maps.LatLng(lat, lng));
-        // 역지오코딩으로 출발지 자동 입력
         if (geocoder) {
           geocoder.coord2Address(lng, lat, (result, status) => {
             if (status === kakao.maps.services.Status.OK && result.length) {
               const addr = result[0].road_address
                 ? result[0].road_address.address_name
                 : result[0].address.address_name;
-              document.getElementById('fi-start').value = addr;
-              coords[addr] = { lat, lng };
+              // v3.10: sessionStorage 복원값이 없을 때만 현재위치로 자동입력
+              if (!document.getElementById('fi-start').value) {
+                document.getElementById('fi-start').value = addr;
+                coords[addr] = { lat, lng };
+              }
             } else {
-              document.getElementById('fi-start').value = '현재 위치';
-              coords['현재 위치'] = { lat, lng };
+              if (!document.getElementById('fi-start').value) {
+                document.getElementById('fi-start').value = '현재 위치';
+                coords['현재 위치'] = { lat, lng };
+              }
             }
           });
         }
       });
     }
 
-    // Kakao JS SDK 초기화
     if (window.Kakao && !Kakao.isInitialized()) {
       Kakao.init(KAKAO_KEY);
     }
@@ -426,20 +412,51 @@ async function initApp() {
     hideStatus();
     setupBackButtonGuard();
 
-    // 초기 경유지 세팅
+    // 초기 경유지 세팅 (v3.10: restoreFromSession이 대신 처리)
     stops = []; sid = 0;
     document.getElementById('stopsEl').innerHTML = '';
-    //['경주불국사','안동하회마을'].forEach(n => addStop(n));
-    addStop();
-    addStop();
+    restoreFromSession();
 
-    // opts 버튼 초기 동기화
     Object.keys(opts).forEach(k => {
       document.getElementById('opt-' + k).classList.toggle('on', opts[k]);
     });
     setupInputs();
   } catch(e) {
     showStatus('⚠️ 지도 로드 실패: ' + e.message);
+  }
+}
+
+// ────────────────────────────────────────
+// v3.10: sessionStorage 자동저장 / 복원
+// ────────────────────────────────────────
+const SS_KEY = 'rm_session_v1';
+
+function saveToSession() {
+  const data = {
+    start: document.getElementById('fi-start').value,
+    end: document.getElementById('fi-end').value,
+    stops: stops.map(s => s.name)
+  };
+  sessionStorage.setItem(SS_KEY, JSON.stringify(data));
+}
+
+function restoreFromSession() {
+  try {
+    const raw = sessionStorage.getItem(SS_KEY);
+    if (!raw) {
+      addStop(); addStop();
+      return;
+    }
+    const data = JSON.parse(raw);
+    if (data.start) document.getElementById('fi-start').value = data.start;
+    if (data.end) document.getElementById('fi-end').value = data.end;
+    if (data.stops && data.stops.length > 0) {
+      data.stops.forEach(name => addStop(name));
+    } else {
+      addStop(); addStop();
+    }
+  } catch(e) {
+    addStop(); addStop();
   }
 }
 
@@ -478,12 +495,14 @@ function useCurrentLocation() {
             input.value = '현재 위치';
             coords['현재 위치'] = { lat, lng };
           }
+          saveToSession();
         });
       } else {
         btn.classList.remove('spinning');
         btn.disabled = false;
         input.value = '현재 위치';
         coords['현재 위치'] = { lat, lng };
+        saveToSession();
       }
     },
     err => {
@@ -502,6 +521,7 @@ let coords = {};
 function setupInputs() {
   setupAC('fi-start', 'ac-start');
   setupAC('fi-end', 'ac-end');
+  // v3.10: blur 시 저장은 setupAC 내부에서 처리
 }
 
 function setupAC(inputId, acId) {
@@ -526,6 +546,7 @@ function setupAC(inputId, acId) {
   });
   input.addEventListener('blur', () => {
     setTimeout(() => { acEl.style.display = 'none'; }, 200);
+    saveToSession(); // v3.10
   });
 }
 
@@ -546,6 +567,7 @@ function doSearch(query, acEl, input) {
         input.value = p.place_name;
         coords[p.place_name] = { lat: parseFloat(p.y), lng: parseFloat(p.x) };
         acEl.style.display = 'none';
+        saveToSession(); // v3.10
       });
       acEl.appendChild(item);
     });
@@ -567,6 +589,7 @@ function addStop(name = '') {
 function removeStop(id) {
   stops = stops.filter(s => s.id !== id);
   renderStops();
+  saveToSession(); // v3.10
 }
 
 function renderStops() {
@@ -610,6 +633,10 @@ function renderStops() {
     });
     input.addEventListener('blur', () => {
       setTimeout(() => { acEl.style.display = 'none'; }, 200);
+      saveToSession(); // v3.10
+    });
+    acEl.addEventListener('mousedown', () => {
+      setTimeout(saveToSession, 300); // v3.10: 자동완성 선택 후 저장
     });
   });
 }
@@ -620,9 +647,6 @@ function togOpt(k) {
   opts[k] = !opts[k];
   document.getElementById('opt-' + k).classList.toggle('on', opts[k]);
 }
-
-// ── MODE ──
-// (단일 모드)
 
 // ── GEOCODING ──
 function getCoords(name) {
@@ -652,7 +676,7 @@ function dist(a, b) {
   const dLat = (b.lat-a.lat)*Math.PI/180;
   const dLng = (b.lng-a.lng)*Math.PI/180;
   const h = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R * 2 * Math.asin(Math.sqrt(h)) * 1.25;    // 도로보정계수: 직선거리 × 1.25 ≈ 실제 도로거리
+  return R * 2 * Math.asin(Math.sqrt(h)) * 1.25;
 }
 
 function totalDist(arr) {
@@ -720,7 +744,6 @@ async function optimize() {
     let ordNames, ordCs;
 
     if (wpNames.length === 0) {
-      // 경유지 없음 - 출발지 → 도착지 직접 연결
       ordNames = [startName, endName];
       ordCs = [startC, endC];
     } else {
@@ -823,28 +846,17 @@ function closeSheet() {
 function openKakaoNavi() {
   if (!result) return;
   const { ordNames, ordCs } = result;
-
   const destIdx = ordNames.length - 1;
   const destName = ordNames[destIdx];
   const destC = ordCs[destIdx];
-
   const viaPoints = [];
   for (let i = 1; i < destIdx; i++) {
     viaPoints.push({ name: ordNames[i], x: ordCs[i].lng, y: ordCs[i].lat });
   }
-
   if (!window.Kakao) { alert('카카오 SDK가 로드되지 않았습니다.'); return; }
-  if (!Kakao.isInitialized()) {
-    Kakao.init(KAKAO_KEY);
-  }
-
+  if (!Kakao.isInitialized()) { Kakao.init(KAKAO_KEY); }
   try {
-    const naviParams = {
-      name: destName,
-      x: destC.lng,
-      y: destC.lat,
-      coordType: 'wgs84'
-    };
+    const naviParams = { name: destName, x: destC.lng, y: destC.lat, coordType: 'wgs84' };
     if (viaPoints.length > 0) {
       naviParams.viaPoints = viaPoints.map(p => ({ name: p.name, x: p.x, y: p.y }));
     }
@@ -861,18 +873,16 @@ function openMapFullscreen() {
   setTimeout(() => {
     kakaoMap.relayout();
     if (!result) {
-      // 초기 화면에서 내 위치가 잡혀있으면 그 위치로 100m 레벨
       const startName = document.getElementById('fi-start').value.trim();
       const startC = startName && coords[startName];
       if (startC) {
         kakaoMap.setCenter(new kakao.maps.LatLng(startC.lat, startC.lng));
         kakaoMap.setLevel(4);
       }
-      // 내 위치 없으면 한반도 전체 뷰 중앙으로
-      } else {
-        kakaoMap.setCenter(new kakao.maps.LatLng(50.0, 142.0));
-        kakaoMap.setLevel(13);
-      }
+    } else {
+      kakaoMap.setCenter(new kakao.maps.LatLng(50.0, 142.0));
+      kakaoMap.setLevel(13);
+    }
   }, 300);
 }
 function closeMapFullscreen() {
@@ -887,13 +897,12 @@ function closeMapFullscreen() {
 // ────────────────────────────────────────
 let myLocMarker = null;
 let myLocWatchId = null;
-let myLocTracking = false; // 빨간 버튼 ON/OFF
-let myLocFollowing = false; // 지도 따라오기 여부
+let myLocTracking = false;
+let myLocFollowing = false;
 let myArrowEl = null;
 
 function toggleMyLocation() {
   if (myLocTracking) {
-    // 파란 점이 이미 표시 중 - 지도 따라오기만 토글
     myLocFollowing = !myLocFollowing;
     const btn = document.getElementById('btnMyLoc');
     if (myLocFollowing) {
@@ -904,7 +913,6 @@ function toggleMyLocation() {
       btn.textContent = '📍';
     }
   } else {
-    // 파란 점도 없음 - 전체 시작
     startMyLocation();
   }
 }
@@ -914,10 +922,7 @@ function startMyLocation(following = true) {
   myLocTracking = true;
   myLocFollowing = following;
   const btn = document.getElementById('btnMyLoc');
-  if (following) {
-    btn.classList.add('tracking');
-    btn.textContent = '🔵';
-  }
+  if (following) { btn.classList.add('tracking'); btn.textContent = '🔵'; }
 
   startCompass();
   myLocWatchId = navigator.geolocation.watchPosition(
@@ -925,47 +930,29 @@ function startMyLocation(following = true) {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       const latlng = new kakao.maps.LatLng(lat, lng);
-
       if (!myLocMarker) {
         const wrap = document.createElement('div');
         wrap.className = 'my-loc-wrap';
         wrap.innerHTML = '<div class="my-loc-arrow" id="myLocArrow"></div><div class="my-loc-dot"></div>';
         myLocMarker = new kakao.maps.CustomOverlay({
-          map: kakaoMap,
-          position: latlng,
-          content: wrap,
-          yAnchor: 0.5,
-          xAnchor: 0.5,
-          zIndex: 10
+          map: kakaoMap, position: latlng, content: wrap, yAnchor: 0.5, xAnchor: 0.5, zIndex: 10
         });
         myArrowEl = wrap.querySelector('#myLocArrow');
-        // 첫 수신 시 항상 내 위치로 이동 + level 3으로 확대
         kakaoMap.setCenter(latlng);
         kakaoMap.setLevel(3);
       } else {
         myLocMarker.setPosition(latlng);
       }
-
-      // 지도 따라오기는 빨간 버튼 ON일 때만
       if (myLocFollowing) kakaoMap.setCenter(latlng);
     },
-    err => {
-      alert('위치를 가져올 수 없습니다: ' + err.message);
-      stopMyLocation();
-    },
+    err => { alert('위치를 가져올 수 없습니다: ' + err.message); stopMyLocation(); },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
   );
 }
 
 function stopMyLocation() {
-  if (myLocWatchId !== null) {
-    navigator.geolocation.clearWatch(myLocWatchId);
-    myLocWatchId = null;
-  }
-  if (myLocMarker) {
-    myLocMarker.setMap(null);
-    myLocMarker = null;
-  }
+  if (myLocWatchId !== null) { navigator.geolocation.clearWatch(myLocWatchId); myLocWatchId = null; }
+  if (myLocMarker) { myLocMarker.setMap(null); myLocMarker = null; }
   myArrowEl = null;
   myLocTracking = false;
   myLocFollowing = false;
@@ -974,47 +961,30 @@ function stopMyLocation() {
   if (btn) { btn.classList.remove('tracking'); btn.textContent = '📍'; }
 }
 
-// v3.5: 나침반 (DeviceOrientation)
 function startCompass() {
   if (typeof DeviceOrientationEvent === 'undefined') return;
-  // iOS 13+ 는 권한 요청 필요
   if (typeof DeviceOrientationEvent.requestPermission === 'function') {
     DeviceOrientationEvent.requestPermission().then(state => {
-      if (state === 'granted') {
-        window.addEventListener('deviceorientation', onCompass, true);
-      }
+      if (state === 'granted') window.addEventListener('deviceorientation', onCompass, true);
     }).catch(() => {});
   } else {
     window.addEventListener('deviceorientation', onCompass, true);
   }
 }
-
-function stopCompass() {
-  window.removeEventListener('deviceorientation', onCompass, true);
-}
-
+function stopCompass() { window.removeEventListener('deviceorientation', onCompass, true); }
 function onCompass(e) {
   if (!myArrowEl) return;
-  // alpha: 나침반 방향 (정북=0, 시계방향 증가)
-  // 화살표를 해당 방향으로 회전
-  const heading = e.webkitCompassHeading != null
-    ? e.webkitCompassHeading        // iOS: 정북 기준 시계방향
-    : (360 - (e.alpha || 0)) % 360; // Android
-  // 화살표는 위쪽(정북)이 기본, heading만큼 회전
+  const heading = e.webkitCompassHeading != null ? e.webkitCompassHeading : (360 - (e.alpha || 0)) % 360;
   myArrowEl.style.transform = `rotate(${heading}deg)`;
 }
 
-// v3.0 추가: 가로/세로 전환 시 지도 relayout
 window.addEventListener('orientationchange', () => {
-  setTimeout(() => {
-    if (kakaoMap) kakaoMap.relayout();
-  }, 300);
+  setTimeout(() => { if (kakaoMap) kakaoMap.relayout(); }, 300);
 });
 
 // ────────────────────────────────────────
 // v2.0 추가: 내 장소 / 내 루트
 // ────────────────────────────────────────
-
 const LS_PLACES = 'rm_places_v2';
 const LS_ROUTES = 'rm_routes_v2';
 const ICONS = ['🏠','🌳','🍽️','☕','⛽','🏪','🏥','🏋️','📍','🎯','🏖️','🏔️','🛒','🎠','🏢','🏫','💼','📖'];
@@ -1033,17 +1003,13 @@ function toggleFavPicker(type) {
   closeAllPickers();
   if (!isOpen) { renderFavPicker(picker, type); picker.classList.add('show'); }
 }
-
 function toggleFavPickerStop(stopId) {
   const picker = document.getElementById('fav-stop-' + stopId);
   const isOpen = picker.classList.contains('show');
   closeAllPickers();
   if (!isOpen) { renderFavPicker(picker, 'stop-' + stopId); picker.classList.add('show'); }
 }
-
-function closeAllPickers() {
-  document.querySelectorAll('.fav-picker').forEach(p => p.classList.remove('show'));
-}
+function closeAllPickers() { document.querySelectorAll('.fav-picker').forEach(p => p.classList.remove('show')); }
 
 function renderFavPicker(picker, type) {
   const places = loadPlaces();
@@ -1069,6 +1035,7 @@ function selectFavPlace(type, idx) {
   }
   if (p.lat && p.lng) coords[p.name] = { lat: p.lat, lng: p.lng };
   closeAllPickers();
+  saveToSession(); // v3.10
 }
 
 document.addEventListener('click', e => { if (!e.target.closest('.iw')) closeAllPickers(); });
@@ -1200,20 +1167,15 @@ function deletePlace(e, idx) {
   places.splice(idx, 1); savePlaces(places); renderPlacesModal();
 }
 
-// v2.1 추가: 장소 편집
 let editingIcon = '📍';
 function openEditPlace(e, idx) {
   e.stopPropagation();
-  // 이미 열려있으면 닫기
   const existing = document.getElementById('edit-form-' + idx);
   if (existing) { existing.remove(); return; }
-  // 다른 편집폼 모두 닫기
   document.querySelectorAll('.edit-place-form').forEach(f => f.remove());
-
   const places = loadPlaces();
   const p = places[idx];
   editingIcon = p.icon;
-
   const form = document.createElement('div');
   form.className = 'edit-place-form';
   form.id = 'edit-form-' + idx;
@@ -1227,7 +1189,6 @@ function openEditPlace(e, idx) {
       <button class="btn-edit-cancel" onclick="closeEditPlace(${idx})">취소</button>
       <button class="btn-edit-save" onclick="saveEditPlace(${idx})">저장</button>
     </div>`;
-
   const item = document.getElementById('place-item-' + idx);
   item.insertAdjacentElement('afterend', form);
 }
@@ -1236,12 +1197,7 @@ function selectEditIcon(ic, idx) {
   editingIcon = ic;
   document.querySelectorAll(`#edit-icon-picker-${idx} .icon-opt`).forEach(el => el.classList.toggle('on', el.textContent === ic));
 }
-
-function closeEditPlace(idx) {
-  const form = document.getElementById('edit-form-' + idx);
-  if (form) form.remove();
-}
-
+function closeEditPlace(idx) { const form = document.getElementById('edit-form-' + idx); if (form) form.remove(); }
 function saveEditPlace(idx) {
   const name = document.getElementById('edit-name-' + idx).value.trim();
   const addr = document.getElementById('edit-addr-' + idx).value.trim();
@@ -1284,6 +1240,7 @@ function loadRoute(idx) {
   r.stops.forEach(name => { sid++; stops.push({ id: sid, name }); });
   renderStops();
   closeModal();
+  saveToSession(); // v3.10
   showStatus(`✅ "${r.name}" 불러오기 완료`); setTimeout(hideStatus, 2000);
 }
 
@@ -1316,13 +1273,3 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
