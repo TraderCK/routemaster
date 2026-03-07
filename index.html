@@ -788,8 +788,8 @@ function showResult(names, cs, optD, savings, totalMin) {
   c.innerHTML = '';
   names.forEach((name, i) => {
     const isS=i===0, isE=i===names.length-1;
-    const segD = i>0 ? dist(cs[i-1],cs[i]).toFixed(1) : 0;
-    const segM = i>0 ? Math.round(segD/(opts.traffic?28:40)*60) : 0;
+    const segD = !isE ? dist(cs[i],cs[i+1]).toFixed(1) : 0;
+    const segM = !isE ? Math.round(segD/(opts.traffic?28:40)*60) : 0;
     const div = document.createElement('div');
     div.className = 'rstep';
     div.innerHTML = `
@@ -799,7 +799,7 @@ function showResult(names, cs, optD, savings, totalMin) {
       </div>
       <div class="rc">
         <div class="rc-name">${name}</div>
-        <div class="rc-meta">${i>0?`↑ ${segD}km · 약 ${segM}분`:'여기서 출발'}</div>
+        <div class="rc-meta">${!isE?`↓ ${segD}km · 약 ${segM}분`:''}</div>
       </div>`;
     c.appendChild(div);
   });
@@ -1297,8 +1297,6 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
-
-
 
 
 
