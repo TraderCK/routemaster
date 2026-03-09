@@ -28,6 +28,7 @@
   v4.3 - 2026.03.08  구간별 거리 및 시간 표시 방식 변경(출->경->착), 소요 시간 실제 시간으로 반영
   v4.3.1- 2026.03.09  내 장소 가나다, 한글 영문 순으로 소팅
   v4.3.2- 2026.03.09  내 장소 내보내기, 가져오기 추가
+  v4.3.3- 2026.03.09  길 찾기 옵션 변경 (최단 시간 추가 및 순서 조정)
 
 -->
 
@@ -268,7 +269,7 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
 <div class="app">
   <!-- Header -->
   <div class="header">
-    <div class="logo">루트<span>마스터</span> <small style="font-size:0.55rem;opacity:0.5;letter-spacing:0">v4.3.2</small></div>
+    <div class="logo">루트<span>마스터</span> <small style="font-size:0.55rem;opacity:0.5;letter-spacing:0"><v4.3.3/small></div>
     <!-- v2.0 추가 -->
     <div class="header-btns">
       <button class="btn-header" onclick="openModal('places')">📌 내 장소</button>
@@ -325,10 +326,12 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
     <button class="btn-add" onclick="addStop()">＋ 경유지 추가 (최대 5개)</button>
 
     <div class="opts">
-      <button class="opt on" id="opt-short" onclick="togOpt('short')">📏 최단거리</button>
+      <button class="opt" id="opt-short" onclick="selectPriority('short')">📏 최단거리</button>
+      <button class="opt on" id="opt-time" onclick="selectPriority('time')">⏱️ 최단시간</button>
       <button class="opt on" id="opt-traffic" onclick="togOpt('traffic')">🚦 교통반영</button>
       <button class="opt" id="opt-return" onclick="togOpt('return')">🔄 출발지복귀</button>
     </div>
+
 
     <!-- v2.0 추가: 루트 이름 입력바 -->
     <div class="route-name-bar" id="routeNameBar">
@@ -463,9 +466,10 @@ async function initApp() {
     addStop();
 
     // opts 버튼 초기 동기화
-    Object.keys(opts).forEach(k => {
-      document.getElementById('opt-' + k).classList.toggle('on', opts[k]);
-    });
+    selectPriority(opts.short ? 'short' : 'time');
+    document.getElementById('opt-traffic').classList.toggle('on', opts.traffic);
+    document.getElementById('opt-return').classList.toggle('on', opts.return);
+
     setupInputs();
   } catch(e) {
     showStatus('⚠️ 지도 로드 실패: ' + e.message);
@@ -663,10 +667,16 @@ function renderStops() {
 }
 
 // ── OPTIONS ──
-let opts = { short: true, traffic: true, return: false };
+let opts = { short: false, traffic: true, return: false };
 function togOpt(k) {
   opts[k] = !opts[k];
   document.getElementById('opt-' + k).classList.toggle('on', opts[k]);
+}
+
+function selectPriority(val) {
+  opts.short = (val === 'short');
+  document.getElementById('opt-short').classList.toggle('on', opts.short);
+  document.getElementById('opt-time').classList.toggle('on', !opts.short);
 }
 
 // ── GEOCODING ──
@@ -1549,4 +1559,3 @@ if ('serviceWorker' in navigator) {
 <div class="toast" id="toast"></div>
 </body>
 </html>
-
