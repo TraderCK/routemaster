@@ -74,7 +74,7 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
 
 /* MAP */
 #map { flex:none; height:319px; position:relative; background:var(--surface); transition:all 0.3s ease; cursor:pointer; }
-#map.fullscreen { position:fixed; inset:0; z-index:100; max-width:100%; cursor:default; }
+#map.fullscreen { position:fixed; inset:0; z-index:100; max-width:100%; width:100% !important; height:100% !important; cursor:default; }
 .btn-map-close { position:absolute; top:12px; right:12px; z-index:101; background:rgba(13,17,23,0.85); border:1px solid var(--border); color:var(--text); width:36px; height:36px; border-radius:50%; font-size:1rem; cursor:pointer; display:none; align-items:center; justify-content:center; }
 #map.fullscreen .btn-map-close { display:flex; }
 .map-empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; pointer-events:none; z-index:1; }
@@ -274,7 +274,7 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
 <div class="app">
   <!-- Header -->
   <div class="header">
-    <div class="logo">루트<span>마스터</span> <small style="font-size:0.55rem;opacity:0.5;letter-spacing:0">v4.3.7</small>
+    <div class="logo">루트<span>마스터</span> <small style="font-size:0.55rem;opacity:0.5;letter-spacing:0">v4.3.8</small>
     </div>
     <!-- v2.0 추가 -->
     <div class="header-btns">
@@ -1047,7 +1047,6 @@ function openKakaoNavi() {
 // ── 지도 전체화면 ──
 function openMapFullscreen() {
   const mapEl = document.getElementById('map');
-  mapEl.style.paddingTop = '0';
   mapEl.classList.add('fullscreen');
   setTimeout(() => {
     kakaoMap.relayout();
