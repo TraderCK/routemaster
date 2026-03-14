@@ -32,7 +32,7 @@
   v4.3.4- 2026.03.13  색상 테마를 블루그레이 (#4a6670)로 변경
   v4.3.5- 2026.03.14  구간별 거리/시간 계산 방식 개선 (sections 활용, API 호출 감소)
   v4.3.6- 2026.03.14  지도 고정 높이 + 자동완성 1글자부터 / debounce 단축
-
+  v4.3.7- 2026.03.14  내장소 팝업 닫기 쉽게 만들기
 -->
 
 <!DOCTYPE html>
@@ -272,7 +272,7 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
 <div class="app">
   <!-- Header -->
   <div class="header">
-    <div class="logo">루트<span>마스터</span> <small style="font-size:0.55rem;opacity:0.5;letter-spacing:0">v4.3.6</small>
+    <div class="logo">루트<span>마스터</span> <small style="font-size:0.55rem;opacity:0.5;letter-spacing:0">v4.3.7</small>
     </div>
     <!-- v2.0 추가 -->
     <div class="header-btns">
@@ -548,6 +548,8 @@ let coords = {};
 function setupInputs() {
   setupAC('fi-start', 'ac-start');
   setupAC('fi-end', 'ac-end');
+  document.getElementById('fi-start').addEventListener('focus', closeAllPickers);
+  document.getElementById('fi-end').addEventListener('focus', closeAllPickers);
 }
 
 function setupAC(inputId, acId) {
