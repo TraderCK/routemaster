@@ -29,6 +29,8 @@
   v4.3.1- 2026.03.09  내 장소 가나다, 한글 영문 순으로 소팅
   v4.3.2- 2026.03.09  내 장소 내보내기, 가져오기 추가
   v4.3.3- 2026.03.09  길 찾기 옵션 변경 (최단 시간 추가 및 순서 조정)
+  v4.3.4- 2026.03.13  색상 테마를 블루그레이 (#4a6670)로 변경
+  v4.3.5- 2026.03.14  구간별 거리/시간 계산 방식 개선 (sections 활용, API 호출 감소)
 
 -->
 
@@ -269,7 +271,7 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
 <div class="app">
   <!-- Header -->
   <div class="header">
-    <div class="logo">루트<span>마스터</span> <small style="font-size:0.55rem;opacity:0.5;letter-spacing:0">v4.3.3C</small>
+    <div class="logo">루트<span>마스터</span> <small style="font-size:0.55rem;opacity:0.5;letter-spacing:0">v4.3.5</small>
     </div>
     <!-- v2.0 추가 -->
     <div class="header-btns">
@@ -758,6 +760,7 @@ async function fetchRoadRoute(orderedCs) {
     distanceM: summary.distance,       // 미터
     durationSec: summary.duration,     // 초
     roadCoords,                        // 실제 도로 좌표 배열
+    sections: route.sections.map(s => ({ distance: s.distance, duration: s.duration })),
   };
 }
 
@@ -906,17 +909,11 @@ async function optimize() {
 
     result = { ordNames, ordCs, optDistKm, savings, totalMin, roadCoords: roadResult.roadCoords };
     drawMap(roadResult.roadCoords, ordCs, ordNames);
-    // 구간별 실제 도로 거리/시간 계산
-    document.getElementById('loadingText').textContent = '구간별 경로 계산 중...';
-    const segResults = [];
-    for (let i = 0; i < ordCs.length - 1; i++) {
-      try {
-        const seg = await fetchRoadRoute([ordCs[i], ordCs[i+1]]);
-        segResults.push({ distKm: (seg.distanceM/1000).toFixed(1), min: Math.round(seg.durationSec/60) });
-      } catch(e) {
-        segResults.push({ distKm: '-', min: '-' });
-      }
-    }
+    // 구간별 거리/시간 → roadResult의 sections에서 추출 (추가 API 호출 없음)
+    const segResults = roadResult.sections ? roadResult.sections.map(s => ({
+      distKm: (s.distance / 1000).toFixed(1),
+      min: Math.round(s.duration / 60)
+    })) : [];
     showResult(ordNames, ordCs, optDistKm, savings, totalMin, segResults);
 
   } catch(e) {
@@ -1560,5 +1557,3 @@ if ('serviceWorker' in navigator) {
 <div class="toast" id="toast"></div>
 </body>
 </html>
-
-
