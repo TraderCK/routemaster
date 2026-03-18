@@ -1443,7 +1443,7 @@ function loadRoute(idx) {
   r.stops.forEach(name => { sid++; stops.push({ id: sid, name }); });
   renderStops();
   closeModal();
-  showStatus(`✅ "${r.name}" 불러오기 완료`); setTimeout(hideStatus, 2000);
+  showStatus(`✅ "${r.name}" 불러오기 완료`); setTimeout(hideStatus, 1000);
 }
 
 function deleteRoute(e, idx) {
@@ -1483,13 +1483,12 @@ function exportPlaces() {
   const blob = new Blob([JSON.stringify(places, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `routemaster_places_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `dropby_places_${new Date().toISOString().slice(0,19).replace('T','_').replaceAll(':','')}.json`;
   a.click();
-  showToast('✅ 내 장소를 Download 폴더에 저장했어요', 2000);
+  showToast('✅ 내 장소를 Download 폴더에 저장했어요', 1800);
 }
 
 function importPlaces() {
-  showToast('📂 Download 폴더에서 파일을 선택하세요', 4000);
   const input = document.createElement('input');
   input.type = 'file'; input.accept = '.json';
   input.onchange = e => {
@@ -1513,9 +1512,9 @@ function importPlaces() {
     };
     reader.readAsText(file);
   };
-  input.click();
+  showToast('📂 Download 폴더에서 파일을 선택하세요', 1800);
+  setTimeout(() => input.click(), 1500);
 }
-
 
 // v3.9: 결과 시트 열린 상태에서 백버튼 → 시트 닫기
 function setupBackButtonGuard() {
