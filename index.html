@@ -236,7 +236,7 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
 <div class="app">
   <!-- Header -->
   <div class="header">
-    <div class="logo">루트<span>마스터</span> <small style="font-size:0.55rem;opacity:0.5;letter-spacing:0">v4.3.13</small>
+    <div class="logo">루트<span>마스터</span> <small style="font-size:0.55rem;opacity:0.5;letter-spacing:0">v4.3.14</small>
     </div>
     <!-- v2.0 추가 -->
     <div class="header-btns">
@@ -296,8 +296,8 @@ html,body { height:100%; background:var(--bg); color:var(--text); font-family:'N
     <div class="opts">
       <button class="opt" id="opt-short" onclick="selectPriority('short')">최단 거리</button>
       <button class="opt on" id="opt-time" onclick="selectPriority('time')">최단 시간</button>
+      <button class="opt" id="opt-free" onclick="togOpt('free')">무료 도로</button>
       <button class="opt on" id="opt-traffic" onclick="togOpt('traffic')">실시간 교통</button>
-      <button class="opt" id="opt-return" onclick="togOpt('return')">출발지 복귀</button>
     </div>
 
 
@@ -445,7 +445,7 @@ async function initApp() {
     // opts 버튼 초기 동기화
     selectPriority(opts.short ? 'short' : 'time');
     document.getElementById('opt-traffic').classList.toggle('on', opts.traffic);
-    document.getElementById('opt-return').classList.toggle('on', opts.return);
+    document.getElementById('opt-free').classList.toggle('on', opts.free);
 
     setupInputs();
   } catch(e) {
@@ -648,7 +648,7 @@ function renderStops() {
 }
 
 // ── OPTIONS ──
-let opts = { short: false, traffic: true, return: false };
+let opts = { short: false, traffic: true, free: false };
 function togOpt(k) {
   opts[k] = !opts[k];
   document.getElementById('opt-' + k).classList.toggle('on', opts[k]);
@@ -705,6 +705,7 @@ async function fetchRoadRoute(orderedCs) {
     alternatives: 'false',
     road_details: 'false',
   });
+  if (opts.free) params.append('avoid', 'toll');
 
   if (waypoints.length > 0) {
     params.append('waypoints', waypoints.map(w => `${w.lng},${w.lat}`).join('|'));
